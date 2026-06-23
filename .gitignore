@@ -1,0 +1,20 @@
+# Local explanation/planning notes — not part of submission
+explanation.md
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+env/
+.env/
+
+# Pytest cache
+.pytest_cache/
+
+# VS Code
+.vscode/
