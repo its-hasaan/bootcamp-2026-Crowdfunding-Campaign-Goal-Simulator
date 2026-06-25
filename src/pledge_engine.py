@@ -34,11 +34,13 @@ pledge_log: list[dict] = []
 _log_lock = threading.Lock()   # used ONLY for the log list, NOT for the counter
 
 
-def pledge(campaign: Campaign, backer_id: str, amount: float) -> bool:
+def pledge(campaign: Campaign, backer_id: str, amount: float,
+           verbose: bool = True) -> bool:
     """
     Attempt to add a pledge to the campaign.
 
     Returns True if the pledge was accepted, False if rejected.
+    Set verbose=False to suppress per-pledge print output (used by demo.py).
 
     *** The update to total_pledged and backer_count is intentionally
         NOT atomic — this is where the race condition occurs. ***
@@ -46,8 +48,9 @@ def pledge(campaign: Campaign, backer_id: str, amount: float) -> bool:
 
     # --- Guard: reject pledges when the campaign is no longer live ---
     if not campaign.is_live():
-        print(f"  [REJECTED] Backer {backer_id} pledged ${amount:.2f} "
-              f"— campaign is not live (status={campaign.status!r})")
+        if verbose:
+            print(f"  [REJECTED] Backer {backer_id} pledged ${amount:.2f} "
+                  f"— campaign is not live (status={campaign.status!r})")
         return False
 
     # -------------------------------------------------------------------------
@@ -78,8 +81,9 @@ def pledge(campaign: Campaign, backer_id: str, amount: float) -> bool:
             "timestamp":      time.time(),
         })
 
-    print(f"  [PLEDGE] Backer {backer_id:>6} pledged ${amount:>8.2f} "
-          f"→ observed total ${new_total:>10.2f}")
+    if verbose:
+        print(f"  [PLEDGE] Backer {backer_id:>6} pledged ${amount:>8.2f} "
+              f"→ observed total ${new_total:>10.2f}")
 
     return True
 

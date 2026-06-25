@@ -1,4 +1,4 @@
-# No external dependencies — project uses Python standard library only.
 # Requires Python 3.10+
 
 pytest>=7.0
+rich>=13.0       # terminal UI for demo.py (panels, progress bars, tables)
