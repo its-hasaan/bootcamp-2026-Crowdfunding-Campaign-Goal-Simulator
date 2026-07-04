@@ -13,7 +13,7 @@ import time
 sys.path.insert(0, os.path.dirname(__file__))
 
 from campaign      import Campaign
-from pledge_engine import pledge as _pledge, get_true_total, get_true_backer_count, pledge_log
+from pledge_engine import pledge as _pledge, get_true_total, get_true_backer_count
 from deadline      import start_deadline_checker_thread, close_campaign
 from display       import (
     console,
@@ -34,9 +34,6 @@ PLEDGE_AMOUNT = 100.00
 
 
 def main():
-    # Clear any state from previous runs
-    pledge_log.clear()
-
     # 1. Create campaign
     campaign = Campaign(TITLE, GOAL, DURATION_SEC)
     print_campaign_header(campaign)
@@ -64,7 +61,7 @@ def main():
     deadline_thread.join()
 
     # 7. Print the race condition report
-    print_race_condition_report(campaign, get_true_total(), get_true_backer_count())
+    print_race_condition_report(campaign, get_true_total(campaign), get_true_backer_count(campaign))
 
 
 if __name__ == "__main__":

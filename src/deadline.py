@@ -14,6 +14,7 @@ import time
 import threading
 
 from campaign import Campaign
+from pledge_engine import enqueue_close_request
 
 
 def run_deadline_checker(campaign: Campaign):
@@ -64,16 +65,14 @@ def close_campaign(campaign: Campaign):
       - Otherwise, mark as "failed"
       - Set status to prevent new pledges (via is_live())
 
-    Note: This uses the counter total_pledged, which may be corrupted by
-    race conditions in the pledge engine. The verifier will show the
-    discrepancy between this (corrupted) result and the true total.
+    Note: This resolves status via the queue to avoid race conditions.
 
     Args
     ----
     campaign : Campaign
         The campaign object to close.
     """
-    campaign.status = "successful" if campaign.total_pledged >= campaign.goal_amount else "failed"
+    enqueue_close_request(campaign)
 
     print(f"\n[DEADLINE] Campaign '{campaign.title}' CLOSED at {time.strftime('%H:%M:%S')}")
     print(f"           Pledged: ${campaign.total_pledged:,.2f} / Goal: ${campaign.goal_amount:,.2f}")

@@ -1,25 +1,22 @@
 # =============================================================================
 # MODULE 7: Entry Point / Runner
 # =============================================================================
-# Wires modules 1 and 2 together into a minimal runnable skeleton.
+# Wires modules 1 to 6 together into a runnable simulation.
 #
 # Flow
 # ----
 #  1. Create a Campaign (Module 1)
-#  2. Spawn N concurrent threads, each calling pledge() (Module 2)
-#  3. Wait for all threads to finish
-#  4. Print the observed total vs the true total from the pledge log
-#     — the mismatch is the race condition in action
-#
-# Modules 3-6 (progress reporter, deadline checker, load simulator,
-# verifier) will plug into the stubs below in the next iteration.
+#  2. Start background deadline checker thread (Module 4)
+#  3. Spawn N concurrent backer threads via LoadSimulator (Module 5)
+#  4. Wait for all threads to finish
+#  5. Close campaign and resolve status via verifier (Module 6)
 # =============================================================================
 
 import threading
 import time
 
 from campaign       import Campaign
-from pledge_engine  import pledge, get_true_total, get_true_backer_count
+from pledge_engine  import pledge
 from progress       import get_progress
 from deadline       import start_deadline_checker_thread
 from load_simulator import LoadSimulator
@@ -31,16 +28,10 @@ from verifier       import verify_results, print_summary
 # =============================================================================
 CAMPAIGN_TITLE    = "Open-Source Rover Project"
 GOAL_AMOUNT       = 10_000.00   # $10,000 funding target
-CAMPAIGN_DURATION = 60          # campaign lives for 60 seconds (local demo)
+CAMPAIGN_DURATION = 10          # campaign lives for 10 seconds (local demo)
 
 NUM_BACKERS       = 100         # threads to spawn concurrently
-PLEDGE_AMOUNT     = 100.00      # each backer pledges $100 → expected total = $10,000
-
-
-
-
-
-
+PLEDGE_AMOUNT     = 100.00      # each backer pledges $100 -> expected total = $10,000
 
 
 # =============================================================================

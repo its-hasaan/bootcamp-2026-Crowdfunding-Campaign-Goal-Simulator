@@ -8,6 +8,7 @@
 # =============================================================================
 
 import time
+import threading
 
 
 class Campaign:
@@ -42,6 +43,20 @@ class Campaign:
 
         # --- Campaign lifecycle ---
         self.status = "live"        # transitions to "successful" or "failed"
+
+        # --- Instance-level ledger for ground truth (Change #1) ---
+        self.pledge_log: list[dict] = []
+        self._log_lock = threading.Lock()
+
+    def record_pledge(self, backer_id: str, amount: float, observed_total: float):
+        """Appends a successful pledge record to the campaign's local log in a thread-safe manner."""
+        with self._log_lock:
+            self.pledge_log.append({
+                "backer_id":      backer_id,
+                "amount":         amount,
+                "observed_total": observed_total,
+                "timestamp":      time.time(),
+            })
 
     def is_live(self) -> bool:
         """Returns True only when the campaign is still accepting pledges."""

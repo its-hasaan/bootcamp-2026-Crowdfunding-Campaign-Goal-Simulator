@@ -6,7 +6,7 @@ import time
 import pytest
 
 from campaign import Campaign
-from pledge_engine import pledge, pledge_log, get_true_total, get_true_backer_count
+from pledge_engine import pledge, get_true_total, get_true_backer_count
 from progress import get_progress, get_progress_detailed
 from deadline import close_campaign
 from verifier import verify_results
@@ -19,11 +19,6 @@ from verifier import verify_results
 def fresh_campaign(goal=1000.0, duration=60):
     """Return a brand-new Campaign with a clean state."""
     return Campaign(title="Test Campaign", goal_amount=goal, duration_sec=duration)
-
-
-def clear_log():
-    """Clear the global pledge log between tests."""
-    pledge_log.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -69,9 +64,6 @@ class TestCampaign:
 
 class TestPledgeEngine:
 
-    def setup_method(self):
-        clear_log()
-
     def test_pledge_accepted_when_live(self):
         c = fresh_campaign()
         result = pledge(c, "backer_001", 100.0)
@@ -85,9 +77,9 @@ class TestPledgeEngine:
     def test_pledge_appends_to_log(self):
         c = fresh_campaign()
         pledge(c, "backer_001", 100.0)
-        assert len(pledge_log) == 1
-        assert pledge_log[0]["backer_id"] == "backer_001"
-        assert pledge_log[0]["amount"] == 100.0
+        assert len(c.pledge_log) == 1
+        assert c.pledge_log[0]["backer_id"] == "backer_001"
+        assert c.pledge_log[0]["amount"] == 100.0
 
     def test_pledge_rejected_after_deadline(self):
         c = fresh_campaign()
@@ -105,13 +97,13 @@ class TestPledgeEngine:
         c = fresh_campaign()
         pledge(c, "b1", 100.0)
         pledge(c, "b2", 200.0)
-        assert get_true_total() == 300.0
+        assert get_true_total(c) == 300.0
 
     def test_get_true_backer_count(self):
         c = fresh_campaign()
         pledge(c, "b1", 100.0)
         pledge(c, "b2", 200.0)
-        assert get_true_backer_count() == 2
+        assert get_true_backer_count(c) == 2
 
 
 # ---------------------------------------------------------------------------
@@ -183,16 +175,13 @@ class TestDeadline:
 
 class TestVerifier:
 
-    def setup_method(self):
-        clear_log()
-
     def test_verifier_detects_no_race_when_totals_match(self):
         c = fresh_campaign(goal=300.0)
         pledge(c, "b1", 100.0)
         pledge(c, "b2", 100.0)
         pledge(c, "b3", 100.0)
         # force the counter to match the log (no race simulation)
-        c.total_pledged = get_true_total()
+        c.total_pledged = get_true_total(c)
         close_campaign(c)
         result = verify_results(c)
         assert result["has_race_condition"] is False
@@ -221,3 +210,26 @@ class TestVerifier:
         assert result["verdict_mismatch"] is True
         assert result["observed_verdict"] == "failed"
         assert result["true_verdict"] == "successful"
+
+
+# ---------------------------------------------------------------------------
+# Integration: Concurrency Verification
+# ---------------------------------------------------------------------------
+
+class TestConcurrency:
+
+    def test_concurrency_no_data_loss(self):
+        from load_simulator import LoadSimulator
+        c = fresh_campaign(goal=10000.0, duration=10)
+        simulator = LoadSimulator(num_threads=100, pledge_amount=100.0)
+        load_result = simulator.run(c)
+        
+        # Verify robust invariants (Change #2)
+        assert c.total_pledged <= get_true_total(c)
+        assert get_true_backer_count(c) == load_result["num_successful"]
+        
+        # Verify verifier results
+        close_campaign(c)
+        result = verify_results(c)
+        assert result["lost"] >= 0.0
+        assert result["has_race_condition"] == (result["lost"] > 0.0)

@@ -43,8 +43,8 @@ def verify_results(campaign: Campaign) -> dict:
         - 'has_race_condition': bool (True if lost > 0)
     """
     observed = campaign.total_pledged
-    expected = get_true_total()
-    real_backers = get_true_backer_count()
+    expected = get_true_total(campaign)
+    real_backers = get_true_backer_count(campaign)
 
     lost = expected - observed
     lost_pct = (lost / expected * 100) if expected > 0 else 0
