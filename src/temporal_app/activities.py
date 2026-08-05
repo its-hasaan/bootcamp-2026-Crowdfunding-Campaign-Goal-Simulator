@@ -5,9 +5,50 @@
 # live inside a Temporal Workflow (which must be deterministic for replay).
 #
 # In our case, the main side effects are console output (print statements).
+#
+# Temporal 102 — Activities are where non-determinism and fallible work
+# belong. Unlike Workflow code, Activity code has no determinism constraint,
+# so it is safe (and expected) for it to fail intermittently — Temporal
+# retries Activities automatically according to a RetryPolicy configured
+# by the Workflow that calls them. See validate_campaign_activity below.
 # =============================================================================
 
 from temporalio import activity
+from temporalio.exceptions import ApplicationError
+
+
+@activity.defn
+async def validate_campaign_activity(data: dict) -> dict:
+    """
+    Validates campaign parameters before the campaign goes live.
+
+    Temporal 102 — Activity failures are normal and expected.
+    This Activity deliberately fails on its first two attempts (simulating a
+    transient error such as a flaky downstream service) and succeeds on the
+    third. Temporal automatically retries Activities according to the
+    RetryPolicy the Workflow supplies — no manual retry loop is needed here.
+
+    Args
+    ----
+    data : dict
+        Contains 'title' and 'goal_amount'.
+    """
+    attempt = activity.info().attempt
+    if attempt < 3:
+        print(
+            f"  [VALIDATE] Attempt {attempt} failed (simulated transient error) "
+            f"-- Temporal will retry automatically..."
+        )
+        raise ApplicationError(
+            f"Simulated transient validation failure on attempt {attempt}",
+            non_retryable=False,
+        )
+
+    print(
+        f"  [VALIDATE] Attempt {attempt} succeeded -- campaign "
+        f"'{data['title']}' parameters are valid (goal=${data['goal_amount']:,.2f})."
+    )
+    return {"validated": True, "attempts": attempt}
 
 
 @activity.defn

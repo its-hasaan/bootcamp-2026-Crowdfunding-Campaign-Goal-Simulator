@@ -21,8 +21,9 @@
 
 import asyncio
 import time
-from temporalio.client import Client
+from temporalio.common import WorkflowIDReusePolicy
 
+from src.temporal_app.client_config import get_temporal_client
 from src.temporal_app.workflows import CampaignWorkflow, CampaignInput, PledgeData
 
 # =============================================================================
@@ -35,7 +36,6 @@ NUM_BACKERS       = 100         # concurrent pledge signals to send
 PLEDGE_AMOUNT     = 100.00      # each backer pledges $100 -> expected total = $10,000
 
 TASK_QUEUE        = "crowdfunding-task-queue"
-TEMPORAL_SERVER   = "localhost:7233"
 WORKFLOW_ID       = f"crowdfunding-campaign-{int(time.time())}"
 
 
@@ -52,8 +52,8 @@ async def main():
     print("=" * 70)
 
     # --- Connect to Temporal ---
-    print(f"\n  Connecting to Temporal server at {TEMPORAL_SERVER}...")
-    client = await Client.connect(TEMPORAL_SERVER)
+    print(f"\n  Connecting to Temporal...")
+    client = await get_temporal_client()
     print("  Connected!\n")
 
     # --- Start the Campaign Workflow ---
@@ -66,11 +66,17 @@ async def main():
     )
 
     print(f"  Starting CampaignWorkflow (id={WORKFLOW_ID})...")
+    # Temporal 102 — Workflow ID Reuse Policy: REJECT_DUPLICATE means this
+    # call fails with WorkflowAlreadyStartedError if a Workflow Execution
+    # with the same Workflow ID is already running (or already ran and is
+    # still within retention) in this Namespace. This protects against
+    # accidentally starting the same logical campaign twice.
     handle = await client.start_workflow(
         CampaignWorkflow.run,
         campaign_input,
         id=WORKFLOW_ID,
         task_queue=TASK_QUEUE,
+        id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
     )
     print(f"  Workflow started! Sending {NUM_BACKERS} pledge signals...\n")
 
@@ -106,7 +112,10 @@ async def main():
         print(f"  (Progress query skipped: {e})")
 
     # --- Wait for the workflow to complete ---
-    print(f"\n  Waiting for campaign deadline ({CAMPAIGN_DURATION}s)...\n")
+    # Note: the Workflow adds a short "grace-period-v1" patch window (see
+    # workflows.py — Temporal 102 Versioning with Patching) after the
+    # deadline, so the total wait is slightly longer than CAMPAIGN_DURATION.
+    print(f"\n  Waiting for campaign deadline ({CAMPAIGN_DURATION}s) + grace period...\n")
     result = await handle.result()
 
     # --- Print final summary ---
@@ -115,6 +124,7 @@ async def main():
     print("=" * 70)
 
     print(f"\n  Workflow ID:          {WORKFLOW_ID}")
+    print(f"  Run generation:       {result['generation']} (increments on Continue-As-New)")
     print(f"  Pledges sent:         {NUM_BACKERS}")
     print(f"  Pledges recorded:     {result['pledge_log_length']}")
     print(f"  Observed total:       ${result['observed']:>10,.2f}")
